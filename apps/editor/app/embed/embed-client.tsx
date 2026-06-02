@@ -310,6 +310,11 @@ export default function EmbedClient() {
       v.setShowGrid(!cleanMode)
       v.setShowMeasurements(!cleanMode)
       v.setShowZoneLabels(!cleanMode)
+      // Colour the embed by surface role (floors/furniture/doors/windows) using
+      // the vivid 'pascal-color' theme. Role colours apply only when textures
+      // are off, so force that here for the presentation embed.
+      v.setTextures(false)
+      v.setSceneTheme('pascal-color')
     }
     apply()
     // The Editor re-initialises chrome (grid / dimension lines / zone labels)
