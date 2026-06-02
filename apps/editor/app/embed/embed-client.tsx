@@ -69,29 +69,135 @@ async function gunzipBytes(bytes: Uint8Array): Promise<Uint8Array> {
   return new Uint8Array(buffer)
 }
 
-// Reduce a scene to the structural shell that Pascal's WebGPU renderers
-// handle reliably: site/building/level hierarchy + walls + floor slabs +
-// colored room zones. Door/window/item nodes are dropped because their
-// geometry builders crash the render loop on the data our AI generator
-// currently emits ("Cannot read properties of undefined (reading '0')").
-// A standing-walls + floors + rooms model is exactly what a client needs to
-// read the layout; openings/furniture can be layered back in once their
-// renderers are verified against generated data.
+// Schema defaults that Pascal's door/window renderers read directly (often
+// by tuple index, e.g. openingCornerRadii[0]). The scene is applied with
+// `setScene(as any)` which SKIPS Zod parsing, so these defaults are NOT
+// auto-filled — any field the generator omits arrives as `undefined` and the
+// renderer crashes ("Cannot read properties of undefined (reading '0')").
+// We fill them here so doors/windows render reliably regardless of how
+// complete the generated node is.
+const DOOR_DEFAULTS: Record<string, unknown> = {
+  rotation: [0, 0, 0],
+  width: 0.9,
+  height: 2.1,
+  doorCategory: 'interior',
+  doorType: 'hinged',
+  leafCount: 1,
+  operationState: 0,
+  slideDirection: 'left',
+  trackStyle: 'none',
+  garagePanelCount: 4,
+  openingKind: 'door',
+  openingShape: 'rectangle',
+  openingRadiusMode: 'all',
+  openingTopRadii: [0.15, 0.15],
+  cornerRadius: 0.15,
+  archHeight: 0.45,
+  openingRevealRadius: 0.025,
+  frameThickness: 0.05,
+  frameDepth: 0.07,
+  threshold: true,
+  thresholdHeight: 0.02,
+  hingesSide: 'left',
+  swingDirection: 'inward',
+  swingAngle: 0,
+  handle: true,
+  handleHeight: 1.05,
+  handleSide: 'right',
+  contentPadding: [0.04, 0.04],
+  doorCloser: false,
+  panicBar: false,
+  panicBarHeight: 1.0,
+}
+
+const SEGMENT_DEFAULTS: Record<string, unknown> = {
+  type: 'panel',
+  heightRatio: 1,
+  columnRatios: [1],
+  dividerThickness: 0.03,
+  panelDepth: 0.01,
+  panelInset: 0.04,
+}
+
+const DEFAULT_DOOR_SEGMENTS = [
+  { ...SEGMENT_DEFAULTS, heightRatio: 0.4 },
+  { ...SEGMENT_DEFAULTS, heightRatio: 0.6 },
+]
+
+const WINDOW_DEFAULTS: Record<string, unknown> = {
+  rotation: [0, 0, 0],
+  width: 1.5,
+  height: 1.5,
+  openingKind: 'window',
+  windowType: 'fixed',
+  operationState: 0,
+  awningDirection: 'up',
+  casementStyle: 'single',
+  hingesSide: 'left',
+  openingShape: 'rectangle',
+  openingRadiusMode: 'all',
+  openingCornerRadii: [0.15, 0.15, 0.15, 0.15],
+  cornerRadius: 0.15,
+  archHeight: 0.35,
+  openingRevealRadius: 0.025,
+  frameThickness: 0.05,
+  frameDepth: 0.07,
+  columnRatios: [1],
+  rowRatios: [1],
+  columnDividerThickness: 0.03,
+  rowDividerThickness: 0.03,
+  sill: true,
+  sillDepth: 0.08,
+  sillThickness: 0.03,
+}
+
+// Fill missing keys from defaults (generator-provided values always win).
+function withDefaults(
+  node: Record<string, unknown>,
+  defaults: Record<string, unknown>,
+): Record<string, unknown> {
+  const out: Record<string, unknown> = { ...node }
+  for (const [k, v] of Object.entries(defaults)) {
+    if (out[k] === undefined || out[k] === null) out[k] = v
+  }
+  return out
+}
+
+// Normalize a scene so every node carries the fields its renderer expects.
+// Keeps the structural shell (site/building/level/wall/slab/zone) plus
+// doors and windows (completed with schema defaults). Item/furniture nodes
+// need a fully-formed `asset` object to render; they are dropped unless that
+// is present, so a partial item can never crash the render loop.
 function sanitizeSceneForViewer(scene: SceneGraph): SceneGraph {
-  const KEEP_TYPES = new Set(['site', 'building', 'level', 'wall', 'slab', 'zone'])
+  const STRUCTURAL = new Set(['site', 'building', 'level', 'wall', 'slab', 'zone'])
   const nodes: Record<string, unknown> = {}
 
-  // First pass: keep supported node types. Walls lose their child refs (the
-  // removed doors/windows) so the wall renderer never resolves a missing id.
   for (const [id, raw] of Object.entries(scene.nodes)) {
     const node = raw as Record<string, unknown> | null
     if (!node || typeof node !== 'object') continue
-    if (!KEEP_TYPES.has(node.type as string)) continue
-    nodes[id] = node.type === 'wall' ? { ...node, children: [] } : { ...node }
+    const type = node.type as string
+
+    if (STRUCTURAL.has(type)) {
+      nodes[id] = { ...node }
+    } else if (type === 'door') {
+      const d = withDefaults(node, DOOR_DEFAULTS)
+      const segs = Array.isArray(d.segments) && d.segments.length > 0 ? d.segments : DEFAULT_DOOR_SEGMENTS
+      d.segments = (segs as Record<string, unknown>[]).map((s) => withDefaults(s, SEGMENT_DEFAULTS))
+      nodes[id] = d
+    } else if (type === 'window') {
+      nodes[id] = withDefaults(node, WINDOW_DEFAULTS)
+    } else if (type === 'item') {
+      // Only keep items that already carry a full asset descriptor.
+      const asset = node.asset as Record<string, unknown> | undefined
+      if (asset && typeof asset === 'object' && asset.src) {
+        nodes[id] = { ...node }
+      }
+      // else: drop partial item silently
+    }
+    // unknown types are dropped
   }
 
-  // Second pass: drop any remaining child references that point at nodes we
-  // removed, so parent renderers don't dereference undefined children.
+  // Drop child references that point at nodes we removed.
   for (const id of Object.keys(nodes)) {
     const node = nodes[id] as Record<string, unknown>
     if (Array.isArray(node.children)) {
