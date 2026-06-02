@@ -59,18 +59,37 @@ export const CustomCameraControls = () => {
     if (!controls.current) return
     if (firstLoad.current) {
       firstLoad.current = false
-      // Only apply the default framing pose when there is NO scene to
-      // auto-frame. A loaded scene is positioned by `useAutoFrame`'s
-      // `fit-scene` emit, which fires synchronously during `setScene` —
-      // i.e. BEFORE this effect runs. Applying the default `setLookAt`
-      // here would clobber that nice 3/4 framing and leave the camera
-      // staring at the world origin instead of the apartment (walls then
-      // read as thin slivers off to the side, and orbiting just spins
-      // around empty space). Skip it when nodes exist.
-      const sceneIsEmpty = Object.keys(useScene.getState().nodes).length === 0
-      if (sceneIsEmpty) {
-        controls.current.setLookAt(20, 20, 20, 0, 0, 0, true)
+      // Frame the scene DIRECTLY here rather than relying solely on
+      // `useAutoFrame`'s `fit-scene` event. That event fires synchronously
+      // during `setScene`, which can happen BEFORE these camera controls
+      // mount (the WebGPU canvas initialises asynchronously), so the event
+      // is easily missed — leaving the camera staring at the world origin
+      // with the apartment off to the side / out of view. Computing bounds
+      // here makes the initial 3/4 framing reliable regardless of timing.
+      const sceneNodes = useScene.getState().nodes
+      const bounds =
+        Object.keys(sceneNodes).length > 0 ? computeSceneBoundsXZ(sceneNodes) : null
+      if (bounds) {
+        const [cx, cz] = bounds.center
+        const [bw, bd] = bounds.size
+        const maxExtent = Math.max(bw, bd)
+        const distance = Math.max(maxExtent * 1.1, 7)
+        const height = Math.max(maxExtent * 0.45, 3.5)
+        controls.current.setLookAt(
+          cx + distance * 0.7,
+          height,
+          cz + distance * 0.7,
+          cx,
+          1.2,
+          cz,
+          true,
+        )
+        // Scene is framed; skip the level-target nudge below so we don't
+        // flatten the look-at height back to the floor.
+        return
       }
+      // No scene → default empty-editor pose.
+      controls.current.setLookAt(20, 20, 20, 0, 0, 0, true)
     }
     controls.current.getTarget(currentTarget)
     controls.current.moveTo(currentTarget.x, targetY, currentTarget.z, true)
