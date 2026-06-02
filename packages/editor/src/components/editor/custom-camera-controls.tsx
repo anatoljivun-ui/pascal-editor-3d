@@ -58,7 +58,18 @@ export const CustomCameraControls = () => {
     if (!controls.current) return
     if (firstLoad.current) {
       firstLoad.current = false
-      controls.current.setLookAt(20, 20, 20, 0, 0, 0, true)
+      // Only apply the default framing pose when there is NO scene to
+      // auto-frame. A loaded scene is positioned by `useAutoFrame`'s
+      // `fit-scene` emit, which fires synchronously during `setScene` —
+      // i.e. BEFORE this effect runs. Applying the default `setLookAt`
+      // here would clobber that nice 3/4 framing and leave the camera
+      // staring at the world origin instead of the apartment (walls then
+      // read as thin slivers off to the side, and orbiting just spins
+      // around empty space). Skip it when nodes exist.
+      const sceneIsEmpty = Object.keys(useScene.getState().nodes).length === 0
+      if (sceneIsEmpty) {
+        controls.current.setLookAt(20, 20, 20, 0, 0, 0, true)
+      }
     }
     controls.current.getTarget(currentTarget)
     controls.current.moveTo(currentTarget.x, targetY, currentTarget.z, true)
@@ -522,9 +533,21 @@ export const CustomCameraControls = () => {
       // Use the longer horizontal extent to size the orbit radius so the whole
       // footprint sits in view regardless of aspect ratio.
       const maxExtent = Math.max(w, d)
-      const distance = Math.max(maxExtent * 1.4, 15)
-      const height = Math.max(maxExtent * 0.8, 10)
-      controls.current.setLookAt(cx + distance * 0.7, height, cz + distance * 0.7, cx, 0, cz, true)
+      // Frame close and fairly low so walls read as walls (not thin slivers).
+      // A lower camera height = a more horizontal, immersive 3/4 angle; the
+      // earlier values (distance 1.4x, height 0.8x, min 15/10) sat too high
+      // and far for these small apartments, so walls were barely visible.
+      const distance = Math.max(maxExtent * 1.1, 7)
+      const height = Math.max(maxExtent * 0.45, 3.5)
+      controls.current.setLookAt(
+        cx + distance * 0.7,
+        height,
+        cz + distance * 0.7,
+        cx,
+        1.2, // look slightly above the floor, toward mid-wall height
+        cz,
+        true,
+      )
     }
 
     emitter.on('camera-controls:capture', handleNodeCapture)
@@ -559,12 +582,18 @@ export const CustomCameraControls = () => {
   }
 
   // Preset capture mode frames a single subtree (often a 0.3–2m preset),
-  // so the default 10m minDistance prevents the user from getting close
+  // so the default minDistance prevents the user from getting close
   // enough to compose a good thumbnail. Relax the clamp to 0.5m while
   // capturing presets; reset on exit so general editing keeps the looser
   // navigation guardrails.
+  //
+  // Outside preset capture we use 1.5m (not 10m): apartments here are small
+  // (rooms of 3–5m), and a 10m floor meant the user could never zoom in to
+  // inspect a wall — they were stuck far away with the walls reading as thin
+  // slivers ("nu se vad peretii"). 1.5m lets you get right up to a surface
+  // while still preventing the camera from clipping through it.
   const isPresetCapture = captureMode.mode === 'preset'
-  const minDistance = isPresetCapture ? 0.5 : 10
+  const minDistance = isPresetCapture ? 0.5 : 1.5
 
   return (
     <CameraControls
