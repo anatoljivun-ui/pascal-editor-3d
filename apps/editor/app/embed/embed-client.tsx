@@ -69,6 +69,40 @@ async function gunzipBytes(bytes: Uint8Array): Promise<Uint8Array> {
   return new Uint8Array(buffer)
 }
 
+// Reduce a scene to the structural shell that Pascal's WebGPU renderers
+// handle reliably: site/building/level hierarchy + walls + floor slabs +
+// colored room zones. Door/window/item nodes are dropped because their
+// geometry builders crash the render loop on the data our AI generator
+// currently emits ("Cannot read properties of undefined (reading '0')").
+// A standing-walls + floors + rooms model is exactly what a client needs to
+// read the layout; openings/furniture can be layered back in once their
+// renderers are verified against generated data.
+function sanitizeSceneForViewer(scene: SceneGraph): SceneGraph {
+  const KEEP_TYPES = new Set(['site', 'building', 'level', 'wall', 'slab', 'zone'])
+  const nodes: Record<string, unknown> = {}
+
+  // First pass: keep supported node types. Walls lose their child refs (the
+  // removed doors/windows) so the wall renderer never resolves a missing id.
+  for (const [id, raw] of Object.entries(scene.nodes)) {
+    const node = raw as Record<string, unknown> | null
+    if (!node || typeof node !== 'object') continue
+    if (!KEEP_TYPES.has(node.type as string)) continue
+    nodes[id] = node.type === 'wall' ? { ...node, children: [] } : { ...node }
+  }
+
+  // Second pass: drop any remaining child references that point at nodes we
+  // removed, so parent renderers don't dereference undefined children.
+  for (const id of Object.keys(nodes)) {
+    const node = nodes[id] as Record<string, unknown>
+    if (Array.isArray(node.children)) {
+      node.children = (node.children as string[]).filter((cid) => nodes[cid] !== undefined)
+    }
+  }
+
+  const rootNodeIds = scene.rootNodeIds.filter((id) => nodes[id] !== undefined)
+  return { nodes, rootNodeIds } as SceneGraph
+}
+
 // Decode the `?scene=` parameter end-to-end and return parsed SceneGraph,
 // auto-detecting gzip vs raw UTF-8 JSON. Returns null when decoding fails
 // or the resulting object is not a valid SceneGraph shape.
@@ -92,7 +126,7 @@ async function decodeSceneParam(value: string): Promise<SceneGraph | null> {
       console.error('[embed] Invalid SceneGraph shape:', parsed)
       return null
     }
-    return parsed as SceneGraph
+    return sanitizeSceneForViewer(parsed as SceneGraph)
   } catch (err) {
     console.error('[embed] Failed to decode scene param:', err)
     return null
