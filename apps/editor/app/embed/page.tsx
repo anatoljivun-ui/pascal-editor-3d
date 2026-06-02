@@ -1,13 +1,22 @@
 /**
- * /embed route - Server component with HMAC token validation.
+ * /embed route - Server component with OPTIONAL HMAC token validation.
  *
- * This route is gated by a Masbalt-issued HMAC token to prevent
- * unauthorized public access to the editor. The token must be passed
- * as `?token=<payload_base64url>.<hmac_sha256_hex>`.
+ * **Current state (Phase 1.95):** Token validation is DISABLED by default
+ * to unblock the end-to-end demo while Masbalt finishes wiring its side
+ * of the HMAC token issuance. Anyone with a valid `?scene=` parameter
+ * can render a scene here. This is acceptable for now because the route
+ * doesn't expose any sensitive backend data — it's purely a scene viewer.
  *
- * The shared secret is loaded from the `MASBALT_HMAC_SECRET` environment
- * variable. Set it in BOTH the Pascal Editor Vercel project AND in the
- * Masbalt deployments so tokens issued by Masbalt validate here.
+ * **Re-enabling validation:** Set the env var `EMBED_REQUIRE_TOKEN=true`
+ * on the Pascal Editor Vercel project (Production environment) and
+ * redeploy. The validation logic, helpers, and access-denied UI below
+ * are intentionally kept in place so re-enabling is a one-variable flip
+ * with zero code change.
+ *
+ * **When enabled, the route is gated by a Masbalt-issued HMAC token:**
+ * Pass `?token=<payload_base64url>.<hmac_sha256_hex>` and set the shared
+ * secret in the `MASBALT_HMAC_SECRET` env var on both this project AND
+ * on the Masbalt deployment so tokens issued by Masbalt validate here.
  *
  * Token payload shape (decoded base64url):
  *   {
@@ -101,10 +110,23 @@ interface EmbedPageProps {
 
 export default async function EmbedPage({ searchParams }: EmbedPageProps) {
   const params = await searchParams
-  const validation = validateToken(params.token)
 
-  if (!validation.ok) {
-    return <EmbedAccessDenied reason={validation.reason} />
+  // Token validation is currently OPTIONAL — gated behind the
+  // EMBED_REQUIRE_TOKEN env var. This lets us ship the integration
+  // before the Masbalt side is fully wired to issue tokens.
+  //
+  // To re-enable strict validation in the future, set
+  //   EMBED_REQUIRE_TOKEN=true
+  // on the Pascal Editor Vercel project (Production env) and redeploy.
+  // The validation helpers and access-denied UI below stay in place so
+  // re-enabling is a one-variable flip with no code change.
+  const requireToken = process.env.EMBED_REQUIRE_TOKEN === 'true'
+
+  if (requireToken) {
+    const validation = validateToken(params.token)
+    if (!validation.ok) {
+      return <EmbedAccessDenied reason={validation.reason} />
+    }
   }
 
   return (
