@@ -75,6 +75,7 @@ function formatMeasurement(value: number, unit: 'metric' | 'imperial') {
 
 export function WallMeasurementLabel() {
   const selectedIds = useViewer((state) => state.selection.selectedIds)
+  const showMeasurements = useViewer((state) => state.showMeasurements)
   const nodes = useScene((state) => state.nodes)
 
   const selectedId = selectedIds.length === 1 ? selectedIds[0] : null
@@ -96,6 +97,7 @@ export function WallMeasurementLabel() {
     }
   })
 
+  if (!showMeasurements) return null
   if (!(measurableNode && selectedObject)) return null
 
   return createPortal(<SelectedMeasurementAnnotation node={measurableNode} />, selectedObject)

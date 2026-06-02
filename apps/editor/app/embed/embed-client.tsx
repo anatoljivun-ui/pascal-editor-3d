@@ -16,7 +16,7 @@
  */
 
 import { emitter } from '@pascal-app/core'
-import { Editor, type SceneGraph, type SidebarTab } from '@pascal-app/editor'
+import { Editor, type SceneGraph, type SidebarTab, useViewer } from '@pascal-app/editor'
 import {
   Layers,
   Maximize,
@@ -275,8 +275,22 @@ export default function EmbedClient() {
   const searchParams = useSearchParams()
   const sceneParam = searchParams?.get('scene') ?? null
   const sourceLabel = searchParams?.get('source') ?? null
+  // Clean presentation mode is ON by default for the embed (it exists to show
+  // a polished render to external apps). Pass `?clean=0` to restore editor
+  // chrome (grid, dimension lines, zone name labels) for debugging.
+  const cleanMode = (searchParams?.get('clean') ?? '1') !== '0'
 
   const [state, setState] = useState<LoadState>({ kind: 'loading' })
+
+  // Apply / restore presentation chrome toggles. These flags are not
+  // persisted (see use-viewer partialize), so this never leaks into the
+  // main editor — each load starts with chrome on and we flip it here.
+  useEffect(() => {
+    const v = useViewer.getState()
+    v.setShowGrid(!cleanMode)
+    v.setShowMeasurements(!cleanMode)
+    v.setShowZoneLabels(!cleanMode)
+  }, [cleanMode])
 
   // Decode scene parameter asynchronously (gzip inflation requires
   // DecompressionStream which is Promise-based).

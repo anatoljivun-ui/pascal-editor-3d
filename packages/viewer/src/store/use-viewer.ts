@@ -74,6 +74,14 @@ type ViewerState = {
   showGrid: boolean
   setShowGrid: (show: boolean) => void
 
+  // Non-persisted presentation toggles. Default true (editor chrome on).
+  // The /embed viewer flips these off for a clean presentation render.
+  showMeasurements: boolean
+  setShowMeasurements: (show: boolean) => void
+
+  showZoneLabels: boolean
+  setShowZoneLabels: (show: boolean) => void
+
   projectId: string | null
   setProjectId: (id: string | null) => void
   projectPreferences: Record<
@@ -202,6 +210,12 @@ const useViewer = create<ViewerState>()(
           }
           return { showGrid: show, projectPreferences }
         }),
+
+      showMeasurements: true,
+      setShowMeasurements: (show) => set({ showMeasurements: show }),
+
+      showZoneLabels: true,
+      setShowZoneLabels: (show) => set({ showZoneLabels: show }),
 
       projectId: null,
       setProjectId: (id) =>

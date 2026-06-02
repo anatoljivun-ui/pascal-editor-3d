@@ -30,6 +30,7 @@ export function SiteEdgeLabels() {
     return node?.type === 'site' ? (node as SiteNode) : null
   })
   const unit = useViewer((state) => state.unit)
+  const showMeasurements = useViewer((state) => state.showMeasurements)
   const isNight = useViewer((state) => getSceneTheme(state.sceneTheme).appearance === 'dark')
 
   const siteNodeId = siteNode?.id
@@ -65,6 +66,7 @@ export function SiteEdgeLabels() {
     })
   }, [siteNode?.polygon?.points])
 
+  if (!showMeasurements) return null
   if (!siteObj || edges.length === 0) return null
 
   return createPortal(

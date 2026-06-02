@@ -302,6 +302,7 @@ function ZoneLabelEditor({ zoneId }: { zoneId: ZoneNode['id'] }) {
 // ─── System: rendered in the main React tree (outside Canvas) ─────────────────
 
 export function ZoneLabelEditorSystem() {
+  const showZoneLabels = useViewer((s) => s.showZoneLabels)
   const zoneIds = useScene(
     useShallow((s) =>
       Object.values(s.nodes)
@@ -309,6 +310,8 @@ export function ZoneLabelEditorSystem() {
         .map((n) => n.id as ZoneNode['id']),
     ),
   )
+
+  if (!showZoneLabels) return null
 
   return (
     <>
