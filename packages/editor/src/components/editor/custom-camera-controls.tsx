@@ -14,6 +14,7 @@ import { useThree } from '@react-three/fiber'
 import { useCallback, useEffect, useMemo, useRef } from 'react'
 import { Box3, Vector3 } from 'three'
 import { EDITOR_LAYER } from '../../lib/constants'
+import { computeSceneBoundsXZ } from '../../lib/scene-bounds'
 import useEditor from '../../store/use-editor'
 
 const currentTarget = new Vector3()
@@ -517,19 +518,39 @@ export const CustomCameraControls = () => {
       controls.current.rotateTo(target, currentPolar, true)
     }
 
+    // Button-driven zoom (on-screen +/- controls in the embed viewer).
+    // factor > 0 zooms IN, factor < 0 zooms OUT. For a perspective camera we
+    // dolly along the view direction; for orthographic we change the zoom.
+    // The step is scaled by the current distance so it feels consistent at
+    // any range. This is the trackpad/tablet-friendly path — no wheel needed.
+    const handleZoom = ({ factor }: { factor: number }) => {
+      if (!controls.current) return
+      if (cameraMode === 'orthographic') {
+        // zoom() multiplies the ortho zoom; positive factor zooms in.
+        controls.current.zoom(controls.current.camera.zoom * 0.4 * factor, true)
+        return
+      }
+      const distance = controls.current.distance
+      // Dolly ~30% of the current distance per press, in the chosen direction.
+      controls.current.dolly(distance * 0.3 * factor, true)
+    }
+
     const handleNodeFocus = ({ nodeId }: CameraControlEvent) => {
       focusNode(nodeId)
     }
 
     const handleFitScene = ({ bounds }: CameraControlFitSceneEvent) => {
       if (!controls.current || isPreviewMode) return
-      if (!bounds) {
-        // Restore default framing pose when no bounds were computed.
+      // When no bounds are supplied (e.g. the on-screen "fit" button), derive
+      // them from the current scene so we re-frame the actual apartment rather
+      // than jumping to a fixed pose aimed at the world origin.
+      const effectiveBounds = bounds ?? computeSceneBoundsXZ(useScene.getState().nodes)
+      if (!effectiveBounds) {
         controls.current.setLookAt(20, 20, 20, 0, 0, 0, true)
         return
       }
-      const [cx, cz] = bounds.center
-      const [w, d] = bounds.size
+      const [cx, cz] = effectiveBounds.center
+      const [w, d] = effectiveBounds.size
       // Use the longer horizontal extent to size the orbit radius so the whole
       // footprint sits in view regardless of aspect ratio.
       const maxExtent = Math.max(w, d)
@@ -556,6 +577,7 @@ export const CustomCameraControls = () => {
     emitter.on('camera-controls:top-view', handleTopView)
     emitter.on('camera-controls:orbit-cw', handleOrbitCW)
     emitter.on('camera-controls:orbit-ccw', handleOrbitCCW)
+    emitter.on('camera-controls:zoom', handleZoom)
     emitter.on('camera-controls:fit-scene', handleFitScene)
 
     return () => {
@@ -565,9 +587,10 @@ export const CustomCameraControls = () => {
       emitter.off('camera-controls:top-view', handleTopView)
       emitter.off('camera-controls:orbit-cw', handleOrbitCW)
       emitter.off('camera-controls:orbit-ccw', handleOrbitCCW)
+      emitter.off('camera-controls:zoom', handleZoom)
       emitter.off('camera-controls:fit-scene', handleFitScene)
     }
-  }, [focusNode, isPreviewMode])
+  }, [focusNode, isPreviewMode, cameraMode])
 
   const onTransitionStart = useCallback(() => {
     useViewer.getState().setCameraDragging(true)

@@ -15,11 +15,21 @@
  * useSearchParams() requires a Suspense boundary in Next.js 14+.
  */
 
+import { emitter } from '@pascal-app/core'
 import { Editor, type SceneGraph, type SidebarTab } from '@pascal-app/editor'
-import { Layers, Package, Settings } from 'lucide-react'
+import {
+  Layers,
+  Maximize,
+  Package,
+  RotateCcw,
+  RotateCw,
+  Settings,
+  ZoomIn,
+  ZoomOut,
+} from 'lucide-react'
 import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { type ReactNode, useCallback, useEffect, useMemo, useState } from 'react'
 import {
   CommunityViewerToolbarLeft,
   CommunityViewerToolbarRight,
@@ -246,6 +256,85 @@ export default function EmbedClient() {
         viewerToolbarLeft={<CommunityViewerToolbarLeft />}
         viewerToolbarRight={<CommunityViewerToolbarRight />}
       />
+
+      {/*
+        On-screen camera controls. These drive the camera through the core
+        event bus, so they work identically with a mouse, a laptop trackpad
+        (where Safari/macOS make drag-rotate and pinch-zoom unreliable), and
+        touch on tablets. Buttons are 44px+ for comfortable tapping.
+      */}
+      <div className="pointer-events-none absolute right-3 bottom-3 z-40 flex flex-col items-end gap-2">
+        <div className="pointer-events-auto flex flex-col overflow-hidden rounded-2xl border border-border/60 bg-background/90 shadow-lg backdrop-blur">
+          <ControlButton
+            label="Apropie (zoom +)"
+            onClick={() => emitter.emit('camera-controls:zoom', { factor: 1 })}
+          >
+            <ZoomIn className="h-5 w-5" />
+          </ControlButton>
+          <div className="h-px bg-border/60" />
+          <ControlButton
+            label="Departe (zoom -)"
+            onClick={() => emitter.emit('camera-controls:zoom', { factor: -1 })}
+          >
+            <ZoomOut className="h-5 w-5" />
+          </ControlButton>
+        </div>
+
+        <div className="pointer-events-auto flex overflow-hidden rounded-2xl border border-border/60 bg-background/90 shadow-lg backdrop-blur">
+          <ControlButton
+            label="Rotește stânga"
+            onClick={() => emitter.emit('camera-controls:orbit-ccw', undefined)}
+          >
+            <RotateCcw className="h-5 w-5" />
+          </ControlButton>
+          <div className="w-px bg-border/60" />
+          <ControlButton
+            label="Rotește dreapta"
+            onClick={() => emitter.emit('camera-controls:orbit-cw', undefined)}
+          >
+            <RotateCw className="h-5 w-5" />
+          </ControlButton>
+        </div>
+
+        <div className="pointer-events-auto flex overflow-hidden rounded-2xl border border-border/60 bg-background/90 shadow-lg backdrop-blur">
+          <ControlButton
+            label="Vedere de sus / 3D"
+            onClick={() => emitter.emit('camera-controls:top-view', undefined)}
+          >
+            <Layers className="h-5 w-5" />
+          </ControlButton>
+          <div className="w-px bg-border/60" />
+          <ControlButton
+            label="Încadrează tot (reset)"
+            onClick={() => emitter.emit('camera-controls:fit-scene', {})}
+          >
+            <Maximize className="h-5 w-5" />
+          </ControlButton>
+        </div>
+      </div>
     </div>
+  )
+}
+
+// A single large, touch-friendly camera-control button.
+function ControlButton({
+  label,
+  onClick,
+  children,
+}: {
+  label: string
+  onClick: () => void
+  children: ReactNode
+}) {
+  return (
+    <button
+      type="button"
+      aria-label={label}
+      title={label}
+      onClick={onClick}
+      className="flex h-11 w-11 items-center justify-center text-foreground/80 transition-colors hover:bg-accent hover:text-foreground active:bg-accent/80"
+    >
+      {children}
+    </button>
   )
 }
