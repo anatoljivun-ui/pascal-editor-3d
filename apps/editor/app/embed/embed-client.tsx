@@ -16,6 +16,7 @@
  */
 
 import { emitter } from '@pascal-app/core'
+import { AnyNode } from '@pascal-app/core/schema'
 import { Editor, type SceneGraph, type SidebarTab, useViewer } from '@pascal-app/editor'
 import {
   Layers,
@@ -170,6 +171,20 @@ function withDefaults(
 // is present, so a partial item can never crash the render loop.
 function sanitizeSceneForViewer(scene: SceneGraph): SceneGraph {
   const STRUCTURAL = new Set(['site', 'building', 'level', 'wall', 'slab', 'zone'])
+  // Rich structural extras (roof/ceiling/stair/column/shelf + their segment
+  // children). These were previously dropped, leaving a flat open-top box.
+  // We keep them via the real Zod schema (AnyNode.safeParse), which fills
+  // every default and validates — partial generator output that would crash
+  // the renderer fails validation and is dropped defensively instead.
+  const RICH = new Set([
+    'roof',
+    'roof-segment',
+    'ceiling',
+    'stair',
+    'stair-segment',
+    'column',
+    'shelf',
+  ])
   const nodes: Record<string, unknown> = {}
 
   for (const [id, raw] of Object.entries(scene.nodes)) {
@@ -193,6 +208,10 @@ function sanitizeSceneForViewer(scene: SceneGraph): SceneGraph {
         nodes[id] = { ...node }
       }
       // else: drop partial item silently
+    } else if (RICH.has(type)) {
+      const parsed = AnyNode.safeParse(node)
+      if (parsed.success) nodes[id] = parsed.data
+      // else: drop node that fails schema validation
     }
     // unknown types are dropped
   }
