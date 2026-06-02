@@ -1,8 +1,18 @@
 'use client'
 
 /**
- * /embed client component - SceneGraph loader from URL param.
- * Wrapped in Suspense by the parent server component.
+ * /embed client component — SceneGraph loader from URL parameter.
+ *
+ * Supports two encodings for the `?scene=` parameter (auto-detected):
+ *  1. base64url(JSON.stringify(scene))           — raw UTF-8 JSON
+ *  2. base64url(gzip(JSON.stringify(scene)))     — gzipped (for large scenes)
+ *
+ * Gzip is detected by inspecting the first two decoded bytes for the gzip
+ * magic number (0x1f 0x8b). When detected, we use the browser-native
+ * DecompressionStream API to inflate the payload before parsing JSON.
+ *
+ * Wrapped in Suspense by the parent server component (page.tsx) because
+ * useSearchParams() requires a Suspense boundary in Next.js 14+.
  */
 
 import { Editor, type SceneGraph, type SidebarTab } from '@pascal-app/editor'
@@ -15,8 +25,9 @@ import {
   CommunityViewerToolbarRight,
 } from '@/components/viewer-toolbar'
 
-// Unicode-safe base64 decode (handles URL-safe variant + missing padding)
-function decodeBase64Url(value: string): string {
+// Decode base64url (RFC 4648 §5) → Uint8Array. Handles missing padding and
+// the `-`/`_` URL-safe substitutions for `+`/`/`.
+function decodeBase64UrlToBytes(value: string): Uint8Array {
   let str = value.replace(/-/g, '+').replace(/_/g, '/')
   const pad = str.length % 4
   if (pad) str += '='.repeat(4 - pad)
@@ -25,12 +36,41 @@ function decodeBase64Url(value: string): string {
   for (let i = 0; i < binary.length; i++) {
     bytes[i] = binary.charCodeAt(i)
   }
-  return new TextDecoder('utf-8').decode(bytes)
+  return bytes
 }
 
-function parseSceneFromParam(sceneParam: string): SceneGraph | null {
+// Inflate a gzipped Uint8Array using the browser DecompressionStream API.
+async function gunzipBytes(bytes: Uint8Array): Promise<Uint8Array> {
+  if (typeof DecompressionStream === 'undefined') {
+    throw new Error(
+      'This browser does not support DecompressionStream. ' +
+        'Please use an up-to-date Chrome, Edge, Firefox, or Safari.',
+    )
+  }
+  // Wrap Uint8Array → Blob → ReadableStream so we can pipe through gzip.
+  // Using a Blob is the simplest cross-browser path; the alternative is
+  // constructing a ReadableStream by hand which is more verbose.
+  // Cast through ArrayBufferLike — Uint8Array<SharedArrayBuffer> is not
+  // assignable to BlobPart in stricter TS configs.
+  const blob = new Blob([bytes.buffer as ArrayBuffer])
+  const ds = new DecompressionStream('gzip')
+  const stream = blob.stream().pipeThrough(ds)
+  const buffer = await new Response(stream).arrayBuffer()
+  return new Uint8Array(buffer)
+}
+
+// Decode the `?scene=` parameter end-to-end and return parsed SceneGraph,
+// auto-detecting gzip vs raw UTF-8 JSON. Returns null when decoding fails
+// or the resulting object is not a valid SceneGraph shape.
+async function decodeSceneParam(value: string): Promise<SceneGraph | null> {
   try {
-    const json = decodeBase64Url(sceneParam)
+    let bytes = decodeBase64UrlToBytes(value)
+    // gzip magic number: first two bytes are 0x1f 0x8b
+    const isGzipped = bytes.length >= 2 && bytes[0] === 0x1f && bytes[1] === 0x8b
+    if (isGzipped) {
+      bytes = await gunzipBytes(bytes)
+    }
+    const json = new TextDecoder('utf-8').decode(bytes)
     const parsed = JSON.parse(json) as Partial<SceneGraph>
     if (
       !parsed ||
@@ -44,7 +84,7 @@ function parseSceneFromParam(sceneParam: string): SceneGraph | null {
     }
     return parsed as SceneGraph
   } catch (err) {
-    console.error('[embed] Failed to parse scene param:', err)
+    console.error('[embed] Failed to decode scene param:', err)
     return null
   }
 }
@@ -75,37 +115,60 @@ const SIDEBAR_TABS: (SidebarTab & { component: React.ComponentType })[] = [
 
 const PROJECT_ID = 'embed-scene'
 
+type LoadState =
+  | { kind: 'loading' }
+  | { kind: 'no-param' }
+  | { kind: 'parse-error' }
+  | { kind: 'ready'; scene: SceneGraph }
+
 export default function EmbedClient() {
   const searchParams = useSearchParams()
   const sceneParam = searchParams?.get('scene') ?? null
   const sourceLabel = searchParams?.get('source') ?? null
-  const [hasParam, setHasParam] = useState<boolean | null>(null)
-  const [parseError, setParseError] = useState(false)
 
-  const initialScene = useMemo<SceneGraph | null>(() => {
-    if (!sceneParam) return null
-    return parseSceneFromParam(sceneParam)
+  const [state, setState] = useState<LoadState>({ kind: 'loading' })
+
+  // Decode scene parameter asynchronously (gzip inflation requires
+  // DecompressionStream which is Promise-based).
+  useEffect(() => {
+    if (!sceneParam) {
+      setState({ kind: 'no-param' })
+      return
+    }
+    let cancelled = false
+    setState({ kind: 'loading' })
+    decodeSceneParam(sceneParam).then((scene) => {
+      if (cancelled) return
+      if (!scene) {
+        setState({ kind: 'parse-error' })
+      } else {
+        setState({ kind: 'ready', scene })
+      }
+    })
+    return () => {
+      cancelled = true
+    }
   }, [sceneParam])
 
-  useEffect(() => {
-    setHasParam(Boolean(sceneParam))
-    setParseError(Boolean(sceneParam) && !initialScene)
-  }, [sceneParam, initialScene])
-
+  // Stable scene reference for Editor's onLoad callback.
+  const readyScene = state.kind === 'ready' ? state.scene : null
   const handleLoad = useCallback(async (): Promise<SceneGraph> => {
-    if (initialScene) return initialScene
+    if (readyScene) return readyScene
     return { nodes: {}, rootNodeIds: [] }
-  }, [initialScene])
+  }, [readyScene])
 
-  if (hasParam === null) {
+  if (state.kind === 'loading') {
     return (
       <div className="flex min-h-screen items-center justify-center bg-background">
-        <div className="text-muted-foreground text-sm">Loading scene...</div>
+        <div className="flex flex-col items-center gap-3">
+          <div className="h-6 w-6 animate-spin rounded-full border-2 border-muted-foreground border-t-transparent" />
+          <div className="text-muted-foreground text-sm">Loading scene...</div>
+        </div>
       </div>
     )
   }
 
-  if (!hasParam) {
+  if (state.kind === 'no-param') {
     return (
       <div className="flex min-h-screen items-center justify-center bg-background p-6">
         <div className="w-full max-w-md rounded-2xl border border-border/60 bg-background p-6 text-center shadow-xl">
@@ -115,7 +178,7 @@ export default function EmbedClient() {
           <h1 className="mt-2 font-semibold text-lg">No scene to display</h1>
           <p className="mt-2 text-muted-foreground text-sm">
             This route expects a <code className="font-mono">?scene=</code> URL
-            parameter with a base64-encoded SceneGraph JSON.
+            parameter with a base64-encoded SceneGraph JSON (gzipped or raw).
           </p>
           <div className="mt-4 flex items-center justify-center gap-2">
             <Link
@@ -136,7 +199,7 @@ export default function EmbedClient() {
     )
   }
 
-  if (parseError) {
+  if (state.kind === 'parse-error') {
     return (
       <div className="flex min-h-screen items-center justify-center bg-background p-6">
         <div className="w-full max-w-md rounded-2xl border border-border/60 bg-background p-6 text-center shadow-xl">
@@ -146,9 +209,10 @@ export default function EmbedClient() {
           <h1 className="mt-2 font-semibold text-lg">Invalid scene data</h1>
           <p className="mt-2 text-muted-foreground text-sm">
             The provided <code className="font-mono">?scene=</code> parameter
-            could not be decoded as a valid SceneGraph JSON. Check the encoding
-            and shape (must include <code className="font-mono">nodes</code> and{' '}
-            <code className="font-mono">rootNodeIds</code>).
+            could not be decoded as a valid SceneGraph JSON. Supported encodings
+            are base64url of raw JSON, or base64url of gzipped JSON. The decoded
+            object must include <code className="font-mono">nodes</code> and{' '}
+            <code className="font-mono">rootNodeIds</code>.
           </p>
           <div className="mt-4 flex items-center justify-center gap-2">
             <Link
@@ -163,6 +227,7 @@ export default function EmbedClient() {
     )
   }
 
+  // state.kind === 'ready'
   return (
     <div className="relative h-screen w-screen">
       <div className="pointer-events-none absolute top-3 left-1/2 z-40 -translate-x-1/2">
