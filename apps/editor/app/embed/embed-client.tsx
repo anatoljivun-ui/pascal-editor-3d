@@ -305,11 +305,20 @@ export default function EmbedClient() {
   // persisted (see use-viewer partialize), so this never leaks into the
   // main editor — each load starts with chrome on and we flip it here.
   useEffect(() => {
-    const v = useViewer.getState()
-    v.setShowGrid(!cleanMode)
-    v.setShowMeasurements(!cleanMode)
-    v.setShowZoneLabels(!cleanMode)
-  }, [cleanMode])
+    const apply = () => {
+      const v = useViewer.getState()
+      v.setShowGrid(!cleanMode)
+      v.setShowMeasurements(!cleanMode)
+      v.setShowZoneLabels(!cleanMode)
+    }
+    apply()
+    // The Editor re-initialises chrome (grid / dimension lines / zone labels)
+    // when it mounts on scene load, which happens AFTER this effect's first
+    // run and would otherwise clobber clean mode. Re-apply once the scene is
+    // ready and again on short delays so clean mode reliably wins the race.
+    const timers = [setTimeout(apply, 120), setTimeout(apply, 600)]
+    return () => timers.forEach(clearTimeout)
+  }, [cleanMode, state.kind])
 
   // Decode scene parameter asynchronously (gzip inflation requires
   // DecompressionStream which is Promise-based).
