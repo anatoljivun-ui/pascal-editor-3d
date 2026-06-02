@@ -103,37 +103,8 @@ export const CustomCameraControls = () => {
     [isPreviewMode],
   )
 
-  // Configure mouse buttons based on control mode and camera mode
-  const cameraMode = useViewer((state) => state.cameraMode)
-  const mouseButtons = useMemo(() => {
-    // Use ZOOM for orthographic camera, DOLLY for perspective camera
-    const wheelAction =
-      cameraMode === 'orthographic'
-        ? CameraControlsImpl.ACTION.ZOOM
-        : CameraControlsImpl.ACTION.DOLLY
-
-    return {
-      left: isPreviewMode ? CameraControlsImpl.ACTION.SCREEN_PAN : CameraControlsImpl.ACTION.NONE,
-      middle: CameraControlsImpl.ACTION.SCREEN_PAN,
-      right: CameraControlsImpl.ACTION.ROTATE,
-      wheel: wheelAction,
-    }
-  }, [cameraMode, isPreviewMode])
-
-  // Touch gestures (mobile / trackpad).
-  // - One finger drag    → rotate by default (much easier on a phone), but
-  //                        falls back to NONE while the user is actively
-  //                        placing/moving something OR in box-select mode,
-  //                        so the editor's pointer handlers (place tool,
-  //                        drag-to-move endpoint, marquee selection drag)
-  //                        keep priority over the camera.
-  //                        In preview mode it's TOUCH_TRUCK (pan), matching
-  //                        preview's left = SCREEN_PAN.
-  // - Two finger pinch   → zoom + pan together (TOUCH_DOLLY_TRUCK for
-  //                        perspective, TOUCH_ZOOM_TRUCK for orthographic).
-  // - Three finger drag  → rotate, so the camera is always orbitable even
-  //                        when one-finger is suppressed by an active
-  //                        editor action.
+  // Editor interaction state — shared by both the mouse and touch configs
+  // below so left-drag / one-finger can yield to active editor tools.
   const tool = useEditor((s) => s.tool)
   const mode = useEditor((s) => s.mode)
   const selectionTool = useEditor((s) => s.floorplanSelectionTool)
@@ -150,6 +121,49 @@ export const CustomCameraControls = () => {
       activeHandleDrag ||
       isBoxSelectActive,
   )
+
+  // Configure mouse buttons based on control mode and camera mode
+  const cameraMode = useViewer((state) => state.cameraMode)
+  const mouseButtons = useMemo(() => {
+    // Use ZOOM for orthographic camera, DOLLY for perspective camera
+    const wheelAction =
+      cameraMode === 'orthographic'
+        ? CameraControlsImpl.ACTION.ZOOM
+        : CameraControlsImpl.ACTION.DOLLY
+
+    // Left-drag ORBITS the camera whenever the user is simply viewing (no
+    // active tool / drag). This is essential for trackpad users (notably
+    // Safari/macOS) who have no easy right-button drag — a plain click-drag
+    // now rotates the scene. When an editor tool is active, or in preview
+    // mode, left yields to its prior behaviour so placement/pan still work.
+    const leftAction = isPreviewMode
+      ? CameraControlsImpl.ACTION.SCREEN_PAN
+      : isInteracting
+        ? CameraControlsImpl.ACTION.NONE
+        : CameraControlsImpl.ACTION.ROTATE
+
+    return {
+      left: leftAction,
+      middle: CameraControlsImpl.ACTION.SCREEN_PAN,
+      right: CameraControlsImpl.ACTION.ROTATE,
+      wheel: wheelAction,
+    }
+  }, [cameraMode, isPreviewMode, isInteracting])
+
+  // Touch gestures (mobile / trackpad).
+  // - One finger drag    → rotate by default (much easier on a phone), but
+  //                        falls back to NONE while the user is actively
+  //                        placing/moving something OR in box-select mode,
+  //                        so the editor's pointer handlers (place tool,
+  //                        drag-to-move endpoint, marquee selection drag)
+  //                        keep priority over the camera.
+  //                        In preview mode it's TOUCH_TRUCK (pan), matching
+  //                        preview's left = SCREEN_PAN.
+  // - Two finger pinch   → zoom + pan together (TOUCH_DOLLY_TRUCK for
+  //                        perspective, TOUCH_ZOOM_TRUCK for orthographic).
+  // - Three finger drag  → rotate, so the camera is always orbitable even
+  //                        when one-finger is suppressed by an active
+  //                        editor action.
   const touches = useMemo(() => {
     const twoFingerAction =
       cameraMode === 'orthographic'

@@ -19,6 +19,7 @@ import {
 } from 'react'
 import { ViewerOverlay } from '../../components/viewer-overlay'
 import { ViewerZoneSystem } from '../../components/viewer-zone-system'
+import { useAutoFrame } from '../../hooks/use-auto-frame'
 import { type SaveStatus, useAutoSave } from '../../hooks/use-auto-save'
 import { useKeyboard } from '../../hooks/use-keyboard'
 import {
@@ -976,6 +977,12 @@ export default function Editor({
     const teardown = initializeEditorRuntime()
     return teardown
   }, [])
+
+  // Auto-frame the camera onto a freshly loaded scene at a 3/4 (45°) angle,
+  // instead of leaving it at the default pose staring at the world origin.
+  // Without this, an embedded apartment that isn't centred on the origin
+  // reads as a flat top-down view until the user manually orbits.
+  useAutoFrame()
 
   useEffect(() => {
     useViewer.getState().setProjectId(projectId ?? null)
