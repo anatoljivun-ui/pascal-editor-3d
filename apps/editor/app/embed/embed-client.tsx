@@ -308,8 +308,11 @@ export default function EmbedClient() {
     const apply = () => {
       const v = useViewer.getState()
       v.setShowGrid(!cleanMode)
-      v.setShowMeasurements(!cleanMode)
-      v.setShowZoneLabels(!cleanMode)
+      // Show wall dimension labels (cote) and room name + area (m2) labels by
+      // default in the embed — they are useful for verification and estimates.
+      // Pass ?clean=0 to also restore the grid.
+      v.setShowMeasurements(true)
+      v.setShowZoneLabels(true)
       // Colour the embed by surface role (floors/furniture/doors/windows) using
       // the vivid 'pascal-color' theme. Role colours apply only when textures
       // are off, so force that here for the presentation embed.
