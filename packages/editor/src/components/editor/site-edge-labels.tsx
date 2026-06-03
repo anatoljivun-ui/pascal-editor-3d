@@ -8,7 +8,10 @@ import { createPortal, useFrame } from '@react-three/fiber'
 import { useMemo, useRef, useState } from 'react'
 import type { Object3D } from 'three'
 
-function formatMeasurement(value: number, unit: 'metric' | 'imperial') {
+function formatMeasurement(value: number, unit: 'metric' | 'imperial' | 'mm') {
+  if (unit === 'mm') {
+    return `${Math.round(value * 1000)}mm`
+  }
   if (unit === 'imperial') {
     const feet = value * 3.280_84
     const wholeFeet = Math.floor(feet)
