@@ -56,8 +56,8 @@ type ViewerState = {
   shadows: boolean
   setShadows: (shadows: boolean) => void
 
-  unit: 'metric' | 'imperial'
-  setUnit: (unit: 'metric' | 'imperial') => void
+  unit: 'metric' | 'imperial' | 'mm'
+  setUnit: (unit: 'metric' | 'imperial' | 'mm') => void
 
   levelMode: 'stacked' | 'exploded' | 'solo' | 'manual'
   setLevelMode: (mode: 'stacked' | 'exploded' | 'solo' | 'manual') => void
