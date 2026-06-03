@@ -88,7 +88,10 @@ type AngleSource = {
   draftVector: WallPlanPoint
 }
 
-function formatMeasurement(value: number, unit: 'metric' | 'imperial') {
+function formatMeasurement(value: number, unit: 'metric' | 'imperial' | 'mm') {
+  if (unit === 'mm') {
+    return `${Math.round(value * 1000)}mm`
+  }
   if (unit === 'imperial') {
     const feet = value * 3.280_84
     const wholeFeet = Math.floor(feet)
@@ -333,7 +336,7 @@ function getDraftMeasurementState(
   start: WallPlanPoint,
   end: WallPlanPoint,
   walls: WallNode[],
-  unit: 'metric' | 'imperial',
+  unit: 'metric' | 'imperial' | 'mm',
   baseY: number,
 ): DraftMeasurementState {
   const dx = end[0] - start[0]

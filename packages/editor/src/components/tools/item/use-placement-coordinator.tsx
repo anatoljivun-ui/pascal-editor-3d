@@ -50,7 +50,10 @@ import type { DraftNodeHandle } from './use-draft-node'
 
 const DEFAULT_DIMENSIONS: [number, number, number] = [1, 1, 1]
 
-function formatMeasurement(value: number, unit: 'metric' | 'imperial') {
+function formatMeasurement(value: number, unit: 'metric' | 'imperial' | 'mm') {
+  if (unit === 'mm') {
+    return `${Math.round(value * 1000)}mm`
+  }
   if (unit === 'imperial') {
     const feet = value * 3.280_84
     const wholeFeet = Math.floor(feet)

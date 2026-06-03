@@ -49,7 +49,10 @@ const ARROW_COLOR = '#8381ed'
 
 // Mirrors the formatter used by wall / fence measurement labels so all
 // in-world dimension chips read consistently.
-function formatDimension(value: number, unit: 'metric' | 'imperial'): string {
+function formatDimension(value: number, unit: 'metric' | 'imperial' | 'mm'): string {
+  if (unit === 'mm') {
+    return `${Math.round(value * 1000)}mm`
+  }
   if (unit === 'imperial') {
     const feet = value * 3.280_84
     const wholeFeet = Math.floor(feet)
