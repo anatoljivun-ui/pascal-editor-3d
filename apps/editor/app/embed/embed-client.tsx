@@ -318,6 +318,12 @@ export default function EmbedClient() {
       // are off, so force that here for the presentation embed.
       v.setTextures(false)
       v.setSceneTheme('pascal-color')
+      // Photoreal lighting for the Masbalt 3D model. 'rendered' turns the
+      // role-coded pascal-color surfaces into PBR materials that pick up the
+      // environment IBL, ambient occlusion, bloom and soft shadows — textures
+      // stay off above, so the deviz colour coding is preserved, just lit
+      // realistically instead of flat.
+      v.setShading('rendered')
     }
     apply()
     // The Editor re-initialises chrome (grid / dimension lines / zone labels)
