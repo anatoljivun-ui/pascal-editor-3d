@@ -44,10 +44,10 @@ export const WindowSystem = () => {
 
   baseMaterial = textures
     ? getBaseMaterial(shading)
-    : createSurfaceRoleMaterial('joinery', colorPreset)
+    : createSurfaceRoleMaterial('joinery', colorPreset, undefined, undefined, shading)
   glassMaterial = textures
     ? defaultGlassMaterial
-    : createSurfaceRoleMaterial('glazing', colorPreset)
+    : createSurfaceRoleMaterial('glazing', colorPreset, undefined, undefined, shading)
 
   useEffect(() => {
     const nodes = useScene.getState().nodes
@@ -62,10 +62,10 @@ export const WindowSystem = () => {
     if (dirtyNodes.size === 0) return
     baseMaterial = textures
       ? getBaseMaterial(shading)
-      : createSurfaceRoleMaterial('joinery', colorPreset)
+      : createSurfaceRoleMaterial('joinery', colorPreset, undefined, undefined, shading)
     glassMaterial = textures
       ? defaultGlassMaterial
-      : createSurfaceRoleMaterial('glazing', colorPreset)
+      : createSurfaceRoleMaterial('glazing', colorPreset, undefined, undefined, shading)
 
     const nodes = useScene.getState().nodes
 

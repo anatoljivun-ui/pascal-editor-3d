@@ -35,7 +35,7 @@ function createResolvedMaterial(
   colorPreset: ColorPreset,
 ): THREE.Material {
   if (!textures) {
-    return createSurfaceRoleMaterial('joinery', colorPreset)
+    return createSurfaceRoleMaterial('joinery', colorPreset, undefined, undefined, shading)
   }
 
   if (materialPreset) {
@@ -127,7 +127,7 @@ export function getStraightStairSegmentBodyMaterials(
   }
 
   if (!textures) {
-    const material = createSurfaceRoleMaterial('joinery', colorPreset)
+    const material = createSurfaceRoleMaterial('joinery', colorPreset, undefined, undefined, shading)
     return [material, material]
   }
 

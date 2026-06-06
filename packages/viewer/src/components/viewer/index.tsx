@@ -13,6 +13,7 @@ import { FloorElevationSystem } from '../../systems/floor-elevation/floor-elevat
 import { GeometrySystem } from '../../systems/geometry/geometry-system'
 import { ErrorBoundary } from '../error-boundary'
 import { SceneRenderer } from '../renderers/scene-renderer'
+import { Environment } from './environment'
 import FrameLimiter from './frame-limiter'
 import { Lights } from './lights'
 import { PerfMonitor } from './perf-monitor'
@@ -263,7 +264,10 @@ const Viewer = forwardRef<ViewerHandle, ViewerProps>(function Viewer(
         debounce: 100,
       }}
       shadows={{
-        type: THREE.PCFShadowMap,
+        // PCFSoftShadowMap (vs the harder PCFShadowMap) routes shadows through
+        // the WebGPU PCFSoftShadowFilter, which honours each light's
+        // shadow.radius for a real penumbra instead of a fixed-width PCF tap.
+        type: THREE.PCFSoftShadowMap,
         enabled: true,
       }}
     >
@@ -276,6 +280,7 @@ const Viewer = forwardRef<ViewerHandle, ViewerProps>(function Viewer(
         {/* <directionalLight position={[10, 10, 5]} intensity={0.5} castShadow
           /> */}
         <Lights />
+        <Environment />
         {useBvh ? (
           <SceneBvh>
             <SceneRenderer />

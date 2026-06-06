@@ -214,7 +214,13 @@ export function getMaterialsForWall(
 
   const interiorSpec = getEffectiveWallSurfaceMaterial(wallNode, 'interior')
   const exteriorSpec = getEffectiveWallSurfaceMaterial(wallNode, 'exterior')
-  const wallRoleMaterial = createSurfaceRoleMaterial('wall', colorPreset, undefined, sceneTheme)
+  const wallRoleMaterial = createSurfaceRoleMaterial(
+    'wall',
+    colorPreset,
+    undefined,
+    sceneTheme,
+    shading,
+  )
 
   // Untextured surfaces take the themed wall role colour even with textures on;
   // only surfaces with an explicit preset/material keep their texture.

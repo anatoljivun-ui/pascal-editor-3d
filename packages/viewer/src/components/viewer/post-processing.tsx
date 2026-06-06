@@ -1,6 +1,7 @@
 import { useFrame, useThree } from '@react-three/fiber'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Color, Layers, type Object3D, UnsignedByteType } from 'three'
+import { bloom } from 'three/addons/tsl/display/BloomNode.js'
 import { ssgi } from 'three/addons/tsl/display/SSGINode.js'
 import { denoise } from 'three/examples/jsm/tsl/display/DenoiseNode.js'
 import {
@@ -45,6 +46,17 @@ export const SSGI_PARAMS = {
   useTemporalFiltering: false,
 }
 
+// Bloom parameters for the photoreal ("rendered") mode. Threshold is in LINEAR
+// light (the RenderPipeline tone-maps after this stage), so 1.0 means only the
+// over-1 HDR highlights — sunlit surfaces, glazing speculars, emissive — glow.
+// Kept subtle so it reads as a lens effect, not a dream filter.
+export const BLOOM_PARAMS = {
+  enabled: true,
+  strength: 0.2,
+  radius: 0.55,
+  threshold: 1,
+}
+
 // Diagnostic toggles for thermal A/B testing. Add `?disable=ao,denoise,outline,postFx`
 // to the URL (any subset) and reload to skip those passes. Each flag prevents
 // allocation + per-frame work for that stage, so device temperature deltas
@@ -57,7 +69,7 @@ export const SSGI_PARAMS = {
 //              directly — isolates raw scene-render cost from any post-FX overhead
 function readPerfDisableFlags() {
   if (typeof window === 'undefined') {
-    return { ao: false, denoise: false, outline: false, postFx: false }
+    return { ao: false, denoise: false, outline: false, postFx: false, bloom: false }
   }
   const raw = new URLSearchParams(window.location.search).get('disable') ?? ''
   const set = new Set(
@@ -71,6 +83,7 @@ function readPerfDisableFlags() {
     denoise: set.has('denoise'),
     outline: set.has('outline'),
     postFx: set.has('postFx'),
+    bloom: set.has('bloom'),
   }
 }
 
@@ -262,6 +275,7 @@ const PostProcessingPasses = ({
     const perfDisable = readPerfDisableFlags()
     const ssgiEnabled = shading === 'rendered' && SSGI_PARAMS.enabled && !perfDisable.ao
     const denoiseEnabled = ssgiEnabled && !perfDisable.denoise
+    const bloomEnabled = shading === 'rendered' && BLOOM_PARAMS.enabled && !perfDisable.bloom
     const outlineEnabled = !perfDisable.outline
     const inkEnabled = edges !== 'off'
     // The depth+normal MRT feeds both SSGI and the screen-space ink pass.
@@ -278,6 +292,7 @@ const PostProcessingPasses = ({
       version: pipelineVersion,
       ssgi: ssgiEnabled,
       denoise: denoiseEnabled,
+      bloom: bloomEnabled,
       outline: outlineEnabled,
       perfDisable,
       hoverHighlightMode,
@@ -398,6 +413,22 @@ const PostProcessingPasses = ({
           add(scenePassColor.rgb.mul(ao), add(zonePass.rgb, scenePassDiffuse.rgb.mul(gi))),
           contentAlpha,
         )
+      }
+
+      // Additive bloom (photoreal mode only): glow seeded from the brightest,
+      // over-1 linear-HDR areas of the raw scene pass — sunlit surfaces, glazing
+      // speculars, emissive. Added before the ink/outline + overlay passes so
+      // edge lines and editor gizmos stay crisp and never bloom. The
+      // RenderPipeline applies ACES tone mapping after this, so the threshold
+      // operates in linear light.
+      if (bloomEnabled) {
+        const bloomNode = bloom(
+          scenePassColor,
+          BLOOM_PARAMS.strength,
+          BLOOM_PARAMS.radius,
+          BLOOM_PARAMS.threshold,
+        )
+        sceneColor = vec4(sceneColor.rgb.add(bloomNode.rgb), sceneColor.a)
       }
 
       // Screen-space ink outline (SketchUp look) — depth/normal edge detection

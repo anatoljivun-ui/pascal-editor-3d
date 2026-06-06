@@ -41,7 +41,7 @@ function getSlabMaterial(
   // 'floor' role colour. createSurfaceRoleMaterial returns a shared cached
   // material, so it is returned as-is without the mutation below.
   if (!textures || (!node.materialPreset && !node.material)) {
-    return createSurfaceRoleMaterial('floor', colorPreset, DoubleSide, sceneTheme)
+    return createSurfaceRoleMaterial('floor', colorPreset, DoubleSide, sceneTheme, shading)
   }
 
   const cacheKey = JSON.stringify({

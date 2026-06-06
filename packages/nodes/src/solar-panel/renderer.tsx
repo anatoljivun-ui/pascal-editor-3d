@@ -94,7 +94,7 @@ const SolarPanelRenderer = ({ node: storeNode }: { node: SolarPanelNode }) => {
   // left untouched in both texture modes.
   const frameMaterial = useMemo(() => {
     if (!textures || (!node.material && !node.materialPreset)) {
-      return createSurfaceRoleMaterial('roof', colorPreset, undefined, sceneTheme)
+      return createSurfaceRoleMaterial('roof', colorPreset, undefined, sceneTheme, shading)
     }
     if (node.material) return createMaterial(node.material, shading)
     return createMaterialFromPresetRef(node.materialPreset, shading) ?? defaultFrameMaterial

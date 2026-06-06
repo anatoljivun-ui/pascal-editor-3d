@@ -42,7 +42,7 @@ function createColumnMaterial({
   textures: boolean
   colorPreset: ColorPreset
 }) {
-  if (!textures) return createSurfaceRoleMaterial('wall', colorPreset)
+  if (!textures) return createSurfaceRoleMaterial('wall', colorPreset, undefined, undefined, shading)
 
   const presetMaterial = createMaterialFromPresetRef(materialPreset, shading)
   if (presetMaterial) return presetMaterial

@@ -27,10 +27,10 @@ export function getRoofMaterials(
         createDefaultMaterial('#e5e5e5', 0.9, shading, THREE.FrontSide), // 3: Shingle
       ]
     : [
-        createSurfaceRoleMaterial('roof', colorPreset),
-        createSurfaceRoleMaterial('ceiling', colorPreset),
-        createSurfaceRoleMaterial('ceiling', colorPreset),
-        createSurfaceRoleMaterial('roof', colorPreset),
+        createSurfaceRoleMaterial('roof', colorPreset, undefined, undefined, shading),
+        createSurfaceRoleMaterial('ceiling', colorPreset, undefined, undefined, shading),
+        createSurfaceRoleMaterial('ceiling', colorPreset, undefined, undefined, shading),
+        createSurfaceRoleMaterial('roof', colorPreset, undefined, undefined, shading),
       ]
   roofMaterialsCache.set(cacheKey, materials)
   return materials

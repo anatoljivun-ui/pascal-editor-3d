@@ -77,7 +77,7 @@ const RidgeVentRenderer = ({ node }: { node: RidgeVentNode }) => {
     // 'roof' role colour. Request DoubleSide directly so the cached role
     // material is the right side — no clone/mutation of a shared material.
     if (!textures || (!node.material && !node.materialPreset)) {
-      return createSurfaceRoleMaterial('roof', colorPreset, THREE.DoubleSide, sceneTheme)
+      return createSurfaceRoleMaterial('roof', colorPreset, THREE.DoubleSide, sceneTheme, shading)
     }
     const base = node.material
       ? createMaterial(node.material, shading)

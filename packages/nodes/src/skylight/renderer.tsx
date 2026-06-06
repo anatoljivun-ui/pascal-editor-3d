@@ -610,7 +610,7 @@ const SkylightRenderer = ({ node: storeNode }: { node: SkylightNode }) => {
     // Untextured frame (and everything in textures-off mode) takes the
     // themed 'joinery' role colour; explicit paint shows when textures on.
     if (!textures || (!node.material && !node.materialPreset)) {
-      return createSurfaceRoleMaterial('joinery', colorPreset, undefined, sceneTheme)
+      return createSurfaceRoleMaterial('joinery', colorPreset, undefined, sceneTheme, shading)
     }
     if (node.material) return createMaterial(node.material, shading)
     return createMaterialFromPresetRef(node.materialPreset, shading) ?? defaultFrameMaterial
@@ -629,7 +629,7 @@ const SkylightRenderer = ({ node: storeNode }: { node: SkylightNode }) => {
     // role material — already DoubleSide + semi-transparent, and shared
     // from the cache, so it must not be mutated.
     if (!textures || (!node.glassMaterial && !node.glassMaterialPreset)) {
-      return createSurfaceRoleMaterial('glazing', colorPreset, undefined, sceneTheme)
+      return createSurfaceRoleMaterial('glazing', colorPreset, undefined, sceneTheme, shading)
     }
     const mat = node.glassMaterial
       ? createMaterial(node.glassMaterial, shading)

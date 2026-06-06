@@ -72,6 +72,7 @@ export const CeilingRenderer = ({ node }: { node: CeilingNode }) => {
   const textures = useViewer((s) => s.textures)
   const colorPreset = useViewer((s) => s.colorPreset)
   const sceneTheme = useViewer((s) => s.sceneTheme)
+  const shading = useViewer((s) => s.shading)
 
   useEffect(
     () => () => {
@@ -87,8 +88,14 @@ export const CeilingRenderer = ({ node }: { node: CeilingNode }) => {
     const hasExplicit = Boolean(node.materialPreset || node.material)
     if (!textures || !hasExplicit) {
       return {
-        topMaterial: createSurfaceRoleMaterial('ceiling', colorPreset, FrontSide, sceneTheme),
-        bottomMaterial: createSurfaceRoleMaterial('ceiling', colorPreset, BackSide, sceneTheme),
+        topMaterial: createSurfaceRoleMaterial('ceiling', colorPreset, FrontSide, sceneTheme, shading),
+        bottomMaterial: createSurfaceRoleMaterial(
+          'ceiling',
+          colorPreset,
+          BackSide,
+          sceneTheme,
+          shading,
+        ),
       }
     }
 
@@ -100,6 +107,7 @@ export const CeilingRenderer = ({ node }: { node: CeilingNode }) => {
     textures,
     colorPreset,
     sceneTheme,
+    shading,
     node.materialPreset,
     node.material,
     node.material?.preset,

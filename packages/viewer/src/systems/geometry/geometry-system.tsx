@@ -166,7 +166,7 @@ export const GeometrySystem = () => {
       )(effectiveNode, ctx, shading, textures, colorPreset, sceneTheme) as unknown as Group
 
       if (!textures && def.surfaceRole) {
-        applyDefaultSurfaceRole(built, def.surfaceRole, colorPreset, sceneTheme)
+        applyDefaultSurfaceRole(built, def.surfaceRole, colorPreset, sceneTheme, shading)
       }
 
       disposeChildren(group)
@@ -274,6 +274,7 @@ function applyDefaultSurfaceRole(
   defaultRole: SurfaceRole,
   colorPreset: ColorPreset,
   sceneTheme?: string,
+  shading: RenderShading = 'solid',
 ) {
   root.traverse((child) => {
     const mesh = child as Partial<Mesh> & {
@@ -289,6 +290,7 @@ function applyDefaultSurfaceRole(
       colorPreset,
       getMaterialSide(mesh.material),
       sceneTheme,
+      shading,
     )
   })
 }

@@ -114,7 +114,7 @@ function createElevatorMaterials(
   colorPreset: ColorPreset = 'clay',
 ) {
   if (!textures) {
-    const material = createSurfaceRoleMaterial('joinery', colorPreset)
+    const material = createSurfaceRoleMaterial('joinery', colorPreset, undefined, undefined, shading)
     return {
       SHAFT_WALL_MATERIAL: material,
       SHAFT_SIDE_MATERIAL: material,

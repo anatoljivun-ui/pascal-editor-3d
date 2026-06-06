@@ -50,7 +50,8 @@ const getMaterialForOriginal = (
   if (original.name.toLowerCase() === 'glass') {
     return glassMaterial
   }
-  if (!textures) return createSurfaceRoleMaterial('furnishing', colorPreset)
+  if (!textures)
+    return createSurfaceRoleMaterial('furnishing', colorPreset, undefined, undefined, shading)
   return baseMaterial(shading)
 }
 

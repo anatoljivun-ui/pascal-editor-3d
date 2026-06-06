@@ -38,7 +38,7 @@ export const DoorSystem = () => {
   // `markDirty` call. Mirrors WallSystem.
   useLiveNodeOverrides((s) => s.overrides)
 
-  const joineryMaterial = createSurfaceRoleMaterial('joinery', colorPreset)
+  const joineryMaterial = createSurfaceRoleMaterial('joinery', colorPreset, undefined, undefined, shading)
   baseMaterial = textures ? getBaseMaterial(shading) : joineryMaterial
   revealMaterial = textures ? defaultRevealMaterial : joineryMaterial
   glassMaterial = textures ? defaultGlassMaterial : joineryMaterial
@@ -54,7 +54,7 @@ export const DoorSystem = () => {
 
   useFrame(() => {
     if (dirtyNodes.size === 0) return
-    const frameJoineryMaterial = createSurfaceRoleMaterial('joinery', colorPreset)
+    const frameJoineryMaterial = createSurfaceRoleMaterial('joinery', colorPreset, undefined, undefined, shading)
     baseMaterial = textures ? getBaseMaterial(shading) : frameJoineryMaterial
     revealMaterial = textures ? defaultRevealMaterial : frameJoineryMaterial
     glassMaterial = textures ? defaultGlassMaterial : frameJoineryMaterial

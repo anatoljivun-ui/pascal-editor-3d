@@ -60,8 +60,10 @@ const DormerRenderer = ({ node: storeNode }: { node: DormerNode }) => {
   // shingle take 'roof'. When textures are off, every slot snaps to its
   // role colour regardless of explicit paint (the render-modes invariant).
   const material = useMemo(() => {
-    const wallRole = () => createSurfaceRoleMaterial('wall', colorPreset, undefined, sceneTheme)
-    const roofRole = () => createSurfaceRoleMaterial('roof', colorPreset, undefined, sceneTheme)
+    const wallRole = () =>
+      createSurfaceRoleMaterial('wall', colorPreset, undefined, sceneTheme, shading)
+    const roofRole = () =>
+      createSurfaceRoleMaterial('roof', colorPreset, undefined, sceneTheme, shading)
 
     const top = getEffectiveDormerSurfaceMaterial(node, 'top')
     const side = getEffectiveDormerSurfaceMaterial(node, 'side')
@@ -100,15 +102,16 @@ const DormerRenderer = ({ node: storeNode }: { node: DormerNode }) => {
   // The window frame bars / sill take the 'joinery' role when untextured;
   // otherwise the deck-side material (slot 1) drives the frame look.
   const frameSideMat = useMemo(() => {
-    if (!textures) return createSurfaceRoleMaterial('joinery', colorPreset, undefined, sceneTheme)
+    if (!textures)
+      return createSurfaceRoleMaterial('joinery', colorPreset, undefined, sceneTheme, shading)
     return material[1]!
-  }, [textures, colorPreset, sceneTheme, material])
+  }, [textures, colorPreset, sceneTheme, shading, material])
 
   // Dormer window glass has no per-node material — it always takes the
   // themed 'glazing' role (semi-transparent) in both texture modes.
   const glassMat = useMemo(
-    () => createSurfaceRoleMaterial('glazing', colorPreset, undefined, sceneTheme),
-    [colorPreset, sceneTheme],
+    () => createSurfaceRoleMaterial('glazing', colorPreset, undefined, sceneTheme, shading),
+    [colorPreset, sceneTheme, shading],
   )
 
   const geometry = useMemo(() => {

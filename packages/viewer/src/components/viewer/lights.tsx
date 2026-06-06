@@ -235,9 +235,9 @@ export function Lights() {
             lightRefs.current[index] = ref
           }}
           shadow-bias={-0.002}
-          shadow-mapSize={[1024, 1024]}
+          shadow-mapSize={[2048, 2048]}
           shadow-normalBias={0.3}
-          shadow-radius={1.5}
+          shadow-radius={4}
         >
           {light.castShadow && !SHADOWS_DISABLED && shadows ? (
             <orthographicCamera

@@ -63,6 +63,22 @@ export const PRESET_PALETTES: Record<ColorPreset, Record<SurfaceRole, string>> =
   blueprint: BLUEPRINT_PALETTE,
 }
 
+// Per-role physically-based reflectance for the photoreal ("rendered") shading
+// mode. Only consumed when a role material is built as MeshStandardNodeMaterial
+// (i.e. shading === 'rendered'), where these drive how each surface picks up the
+// scene.environment IBL: matte plaster walls/ceilings barely reflect, floors get
+// a touch of sheen so the horizon shows up, glass is near-mirror. Architecture is
+// almost all dielectric, so metalness stays 0 across the board.
+export const ROLE_PBR: Record<SurfaceRole, { roughness: number; metalness: number }> = {
+  wall: { roughness: 0.92, metalness: 0 },
+  floor: { roughness: 0.55, metalness: 0 },
+  ceiling: { roughness: 0.95, metalness: 0 },
+  roof: { roughness: 0.75, metalness: 0 },
+  joinery: { roughness: 0.5, metalness: 0 },
+  glazing: { roughness: 0.05, metalness: 0 },
+  furnishing: { roughness: 0.6, metalness: 0 },
+}
+
 export function resolveSurfaceColor(
   role: SurfaceRole,
   preset: ColorPreset,
@@ -523,25 +539,44 @@ export function createSurfaceRoleMaterial(
   preset: ColorPreset,
   side: THREE.Side = THREE.FrontSide,
   sceneThemeId?: string,
+  shading: RenderShading = 'solid',
 ): THREE.Material {
   const resolvedSide = role === 'glazing' ? THREE.DoubleSide : side
-  const cacheKey = `${role}-${preset}-${resolvedSide}-${sceneThemeId ?? 'base'}`
+  const cacheKey = `${role}-${preset}-${resolvedSide}-${sceneThemeId ?? 'base'}-${shading}`
   const cached = surfaceRoleMaterialCache.get(cacheKey)
   if (cached) return cached
 
-  const material =
-    role === 'glazing'
+  const color = resolveSurfaceColor(role, preset, sceneThemeId)
+  const isGlazing = role === 'glazing'
+  const pbr = ROLE_PBR[role]
+
+  // In photoreal ("rendered") mode role surfaces become MeshStandardNodeMaterial
+  // so they pick up the scene.environment IBL via their per-role roughness/
+  // metalness. In "solid" (embed / pascal-color default) they stay the original
+  // flat MeshLambertNodeMaterial — untouched.
+  let material: THREE.Material
+  if (shading === 'rendered') {
+    material = new MeshStandardNodeMaterial({
+      color,
+      side: resolvedSide,
+      roughness: pbr.roughness,
+      metalness: pbr.metalness,
+      ...(isGlazing ? { depthWrite: false, opacity: 0.25, transparent: true } : {}),
+    })
+  } else {
+    material = isGlazing
       ? new MeshLambertNodeMaterial({
-          color: resolveSurfaceColor(role, preset, sceneThemeId),
+          color,
           depthWrite: false,
           opacity: 0.25,
           side: resolvedSide,
           transparent: true,
         })
       : new MeshLambertNodeMaterial({
-          color: resolveSurfaceColor(role, preset, sceneThemeId),
+          color,
           side: resolvedSide,
         })
+  }
 
   material.userData.__pascalCachedMaterial = true
   surfaceRoleMaterialCache.set(cacheKey, material)
