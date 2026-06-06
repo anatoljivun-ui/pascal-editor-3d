@@ -211,6 +211,29 @@ export const SCENE_THEMES: SceneTheme[] = [
       glazing: '#c4dcd0',
     },
   },
+  {
+    id: 'pascal-color',
+    name: 'Pascal Color',
+    appearance: 'light',
+    background: '#ffffff',
+    ground: '#f4f4f2',
+    ambient: { color: '#ffffff', intensity: 0.2 },
+    hemi: { sky: '#ffffff', ground: '#aaa49a', intensity: 0.6 },
+    lights: [
+      { position: [10, 10, 10], color: '#ffffff', intensity: 4, castShadow: true },
+      { position: [-10, 10, -10], color: '#ffffff', intensity: 0.75 },
+    ],
+    toneMappingExposure: 0.95,
+    clayTints: {
+      wall: '#e7e1d4',
+      floor: '#caa46a',
+      ceiling: '#f1ede4',
+      roof: '#b07a4a',
+      joinery: '#9c6b34',
+      glazing: '#6fa8c7',
+      furnishing: '#a86b3c',
+    },
+  },
 ]
 
 export const SCENE_THEME_IDS = SCENE_THEMES.map((theme) => theme.id)

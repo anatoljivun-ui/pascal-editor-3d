@@ -421,14 +421,18 @@ function UnitToggle() {
   const unit = useViewer((state) => state.unit)
   const setUnit = useViewer((state) => state.setUnit)
 
+  const nextUnit = unit === 'metric' ? 'mm' : unit === 'mm' ? 'imperial' : 'metric'
+  const unitTip = unit === 'metric' ? 'Metri (m)' : unit === 'mm' ? 'Milimetri (mm)' : 'Imperial (ft)'
+  const unitGlyph = unit === 'metric' ? 'm' : unit === 'mm' ? 'mm' : 'ft'
+
   return (
-    <ToolbarTooltip label={unit === 'metric' ? 'Metric (m)' : 'Imperial (ft)'}>
+    <ToolbarTooltip label={unitTip}>
       <button
         className={TOOLBAR_BTN}
-        onClick={() => setUnit(unit === 'metric' ? 'imperial' : 'metric')}
+        onClick={() => setUnit(nextUnit)}
         type="button"
       >
-        <span className="font-semibold text-[10px]">{unit === 'metric' ? 'm' : 'ft'}</span>
+        <span className="font-semibold text-[10px]">{unitGlyph}</span>
       </button>
     </ToolbarTooltip>
   )

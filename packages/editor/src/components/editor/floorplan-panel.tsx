@@ -2321,10 +2321,13 @@ function getFloorplanWall(wall: WallNode): WallNode {
 
 function formatMeasurement(
   value: number,
-  unit: 'metric' | 'imperial',
+  unit: 'metric' | 'imperial' | 'mm',
   metersPerUnit: number | null = null,
 ) {
   const measuredValue = metersPerUnit && metersPerUnit > 0 ? value * metersPerUnit : value
+  if (unit === 'mm') {
+    return `${Math.round(measuredValue * 1000)}mm`
+  }
   if (unit === 'imperial') {
     const feet = measuredValue * 3.280_84
     const wholeFeet = Math.floor(feet)
@@ -2406,7 +2409,7 @@ function getSlabArea(polygon: Point2D[], holes: Point2D[][]) {
 
 function formatArea(
   areaSqM: number,
-  unit: 'metric' | 'imperial',
+  unit: 'metric' | 'imperial' | 'mm',
   metersPerUnit: number | null = null,
 ) {
   const scaledAreaSqM =
@@ -3126,7 +3129,7 @@ function FloorplanReferenceScaleLayer({
   guideUi: Record<string, GuideUiState>
   guides: GuideNode[]
   palette: FloorplanPalette
-  unit: 'metric' | 'imperial'
+  unit: 'metric' | 'imperial' | 'mm'
   unitsPerPixel: number
 }) {
   const visibleReferences = guides

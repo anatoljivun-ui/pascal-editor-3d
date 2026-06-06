@@ -14,6 +14,7 @@ import { useThree } from '@react-three/fiber'
 import { useCallback, useEffect, useMemo, useRef } from 'react'
 import { Box3, Vector3 } from 'three'
 import { EDITOR_LAYER } from '../../lib/constants'
+import { computeSceneBoundsXZ } from '../../lib/scene-bounds'
 import useEditor from '../../store/use-editor'
 
 const currentTarget = new Vector3()
@@ -58,6 +59,36 @@ export const CustomCameraControls = () => {
     if (!controls.current) return
     if (firstLoad.current) {
       firstLoad.current = false
+      // Frame the scene DIRECTLY here rather than relying solely on
+      // `useAutoFrame`'s `fit-scene` event. That event fires synchronously
+      // during `setScene`, which can happen BEFORE these camera controls
+      // mount (the WebGPU canvas initialises asynchronously), so the event
+      // is easily missed — leaving the camera staring at the world origin
+      // with the apartment off to the side / out of view. Computing bounds
+      // here makes the initial 3/4 framing reliable regardless of timing.
+      const sceneNodes = useScene.getState().nodes
+      const bounds =
+        Object.keys(sceneNodes).length > 0 ? computeSceneBoundsXZ(sceneNodes) : null
+      if (bounds) {
+        const [cx, cz] = bounds.center
+        const [bw, bd] = bounds.size
+        const maxExtent = Math.max(bw, bd)
+        const distance = Math.max(maxExtent * 1.1, 7)
+        const height = Math.max(maxExtent * 0.45, 3.5)
+        controls.current.setLookAt(
+          cx + distance * 0.7,
+          height,
+          cz + distance * 0.7,
+          cx,
+          1.2,
+          cz,
+          true,
+        )
+        // Scene is framed; skip the level-target nudge below so we don't
+        // flatten the look-at height back to the floor.
+        return
+      }
+      // No scene → default empty-editor pose.
       controls.current.setLookAt(20, 20, 20, 0, 0, 0, true)
     }
     controls.current.getTarget(currentTarget)
@@ -506,25 +537,57 @@ export const CustomCameraControls = () => {
       controls.current.rotateTo(target, currentPolar, true)
     }
 
+    // Button-driven zoom (on-screen +/- controls in the embed viewer).
+    // factor > 0 zooms IN, factor < 0 zooms OUT. For a perspective camera we
+    // dolly along the view direction; for orthographic we change the zoom.
+    // The step is scaled by the current distance so it feels consistent at
+    // any range. This is the trackpad/tablet-friendly path — no wheel needed.
+    const handleZoom = ({ factor }: { factor: number }) => {
+      if (!controls.current) return
+      if (cameraMode === 'orthographic') {
+        // zoom() multiplies the ortho zoom; positive factor zooms in.
+        controls.current.zoom(controls.current.camera.zoom * 0.4 * factor, true)
+        return
+      }
+      const distance = controls.current.distance
+      // Dolly ~30% of the current distance per press, in the chosen direction.
+      controls.current.dolly(distance * 0.3 * factor, true)
+    }
+
     const handleNodeFocus = ({ nodeId }: CameraControlEvent) => {
       focusNode(nodeId)
     }
 
     const handleFitScene = ({ bounds }: CameraControlFitSceneEvent) => {
       if (!controls.current || isPreviewMode) return
-      if (!bounds) {
-        // Restore default framing pose when no bounds were computed.
+      // When no bounds are supplied (e.g. the on-screen "fit" button), derive
+      // them from the current scene so we re-frame the actual apartment rather
+      // than jumping to a fixed pose aimed at the world origin.
+      const effectiveBounds = bounds ?? computeSceneBoundsXZ(useScene.getState().nodes)
+      if (!effectiveBounds) {
         controls.current.setLookAt(20, 20, 20, 0, 0, 0, true)
         return
       }
-      const [cx, cz] = bounds.center
-      const [w, d] = bounds.size
+      const [cx, cz] = effectiveBounds.center
+      const [w, d] = effectiveBounds.size
       // Use the longer horizontal extent to size the orbit radius so the whole
       // footprint sits in view regardless of aspect ratio.
       const maxExtent = Math.max(w, d)
-      const distance = Math.max(maxExtent * 1.4, 15)
-      const height = Math.max(maxExtent * 0.8, 10)
-      controls.current.setLookAt(cx + distance * 0.7, height, cz + distance * 0.7, cx, 0, cz, true)
+      // Frame close and fairly low so walls read as walls (not thin slivers).
+      // A lower camera height = a more horizontal, immersive 3/4 angle; the
+      // earlier values (distance 1.4x, height 0.8x, min 15/10) sat too high
+      // and far for these small apartments, so walls were barely visible.
+      const distance = Math.max(maxExtent * 1.1, 7)
+      const height = Math.max(maxExtent * 0.45, 3.5)
+      controls.current.setLookAt(
+        cx + distance * 0.7,
+        height,
+        cz + distance * 0.7,
+        cx,
+        1.2, // look slightly above the floor, toward mid-wall height
+        cz,
+        true,
+      )
     }
 
     emitter.on('camera-controls:capture', handleNodeCapture)
@@ -533,6 +596,7 @@ export const CustomCameraControls = () => {
     emitter.on('camera-controls:top-view', handleTopView)
     emitter.on('camera-controls:orbit-cw', handleOrbitCW)
     emitter.on('camera-controls:orbit-ccw', handleOrbitCCW)
+    emitter.on('camera-controls:zoom', handleZoom)
     emitter.on('camera-controls:fit-scene', handleFitScene)
 
     return () => {
@@ -542,9 +606,10 @@ export const CustomCameraControls = () => {
       emitter.off('camera-controls:top-view', handleTopView)
       emitter.off('camera-controls:orbit-cw', handleOrbitCW)
       emitter.off('camera-controls:orbit-ccw', handleOrbitCCW)
+      emitter.off('camera-controls:zoom', handleZoom)
       emitter.off('camera-controls:fit-scene', handleFitScene)
     }
-  }, [focusNode, isPreviewMode])
+  }, [focusNode, isPreviewMode, cameraMode])
 
   const onTransitionStart = useCallback(() => {
     useViewer.getState().setCameraDragging(true)
@@ -559,12 +624,18 @@ export const CustomCameraControls = () => {
   }
 
   // Preset capture mode frames a single subtree (often a 0.3–2m preset),
-  // so the default 10m minDistance prevents the user from getting close
+  // so the default minDistance prevents the user from getting close
   // enough to compose a good thumbnail. Relax the clamp to 0.5m while
   // capturing presets; reset on exit so general editing keeps the looser
   // navigation guardrails.
+  //
+  // Outside preset capture we use 1.5m (not 10m): apartments here are small
+  // (rooms of 3–5m), and a 10m floor meant the user could never zoom in to
+  // inspect a wall — they were stuck far away with the walls reading as thin
+  // slivers ("nu se vad peretii"). 1.5m lets you get right up to a surface
+  // while still preventing the camera from clipping through it.
   const isPresetCapture = captureMode.mode === 'preset'
-  const minDistance = isPresetCapture ? 0.5 : 10
+  const minDistance = isPresetCapture ? 0.5 : 1.5
 
   return (
     <CameraControls
