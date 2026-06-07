@@ -109,13 +109,21 @@ function GPUDeviceWatcher() {
 
 function ToneMappingExposure() {
   const sceneTheme = useViewer((state) => state.sceneTheme)
+  const shading = useViewer((state) => state.shading)
   const gl = useThree((state) => state.gl)
   const invalidate = useThree((state) => state.invalidate)
 
   useEffect(() => {
+    // ACES Filmic is the photoreal-mode look only; 'solid' renders
+    // tone-map-free (NoToneMapping) so role colours stay flat and literal.
+    // Output colour space is sRGB in both modes so gamma is always correct.
+    // This runs before PostProcessing rebuilds its RenderPipeline (which reads
+    // renderer.toneMapping at build), so the pipeline picks up the right value.
+    gl.toneMapping = shading === 'rendered' ? THREE.ACESFilmicToneMapping : THREE.NoToneMapping
+    gl.outputColorSpace = THREE.SRGBColorSpace
     gl.toneMappingExposure = getSceneTheme(sceneTheme).toneMappingExposure
     invalidate()
-  }, [gl, invalidate, sceneTheme])
+  }, [gl, invalidate, sceneTheme, shading])
 
   return null
 }
@@ -241,10 +249,14 @@ const Viewer = forwardRef<ViewerHandle, ViewerProps>(function Viewer(
           const promise = (async () => {
             try {
               const renderer = new THREE.WebGPURenderer(props as any)
-              renderer.toneMapping = THREE.ACESFilmicToneMapping
-              renderer.toneMappingExposure = getSceneTheme(
-                useViewer.getState().sceneTheme,
-              ).toneMappingExposure
+              // ACES Filmic only in the photoreal 'rendered' mode; 'solid'
+              // renders tone-map-free so role colours stay flat. Output is sRGB
+              // either way. ToneMappingExposure keeps this in sync on changes.
+              const { shading, sceneTheme } = useViewer.getState()
+              renderer.toneMapping =
+                shading === 'rendered' ? THREE.ACESFilmicToneMapping : THREE.NoToneMapping
+              renderer.outputColorSpace = THREE.SRGBColorSpace
+              renderer.toneMappingExposure = getSceneTheme(sceneTheme).toneMappingExposure
               await renderer.init()
               return renderer
             } catch (err) {
